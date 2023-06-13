@@ -1,0 +1,5 @@
+import fct
+
+if __name__ == "__main__":
+    tags = SE41.runUART()
+    print("Liste ides tags : ", tags)
