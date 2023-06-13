@@ -1,0 +1,133 @@
+import serial
+import serial.tools.list_ports
+#from paho.mqtt import client as client_mqtt
+import random
+
+def init_serial():
+    #Fonction d'initialisation de la class
+    #Essai de l'initialisation automatique du port
+    try:
+        PORT = serial.tools.list_ports.comports()   #Liste des ports séries disponibles
+        PORT = PORT[0].device  #Nom du port série
+        PORT_UART = serial.Serial(port=PORT, baudrate=115200, timeout=1)  #Initialisation et ouverture et stockage du port
+        print("Port : ", PORT)
+        return PORT_UART
+    #Erreur lors de l'essai
+    except serial.SerialException as E :
+        print("Impossible d'initialiser la communication : \n") #Indication sur l'erreur
+        print(E) #Affichage du code d'erreur et des indications renvoyées par SerialException
+        return None
+
+
+def getCONTENT(PORT_UART,NB=10):
+        #Fonction de récupération du contenu des trames reçus dans le port série
+
+        def crc16(trame):
+            #fonction de calcul du crc
+            crc = 0x0000  # valeur initiale du crc selon XMODEM
+            data = bytes.fromhex(trame)  # conversion de la chaine de caratère en un tableau de deux octets
+
+            # conversion des bytes dans le tableau data
+            for dbyte in data:
+                crc ^= dbyte << 8
+                for _ in range(8):
+                    if crc & 0x8000:
+                        crc = (crc << 1) ^ 0x1021
+                    else:
+                        crc <<= 1
+
+            OCT1 = (crc >> 8) & 0xFF
+            OCT2 = crc & 0xFF
+            return f"{OCT1:02X}{OCT2:02X}"
+
+
+        if PORT_UART.in_waiting>0:
+            try:
+                TRAME = PORT_UART.read(PORT_UART.in_waiting) #ouverture et stockage des données du port
+                #print("Trame sans test : ", TRAME)
+                crc16 = crc16(TRAME[:-2].hex()) #calcul du crc
+
+                formated_crc = f"{(TRAME[-2]<<8|TRAME[-1]):04X}" #CRC recu formaté
+
+                # test du crc calculé et du crc transmis
+                if crc16 == formated_crc:
+                    #si les crc corespondent on retourne le contenu
+                    print("Trame testé : ", TRAME[3:-2])
+                    return TRAME[3:-2].hex()
+                else:
+                    print("crc invalide : ", crc16)
+                    return ''
+            except serial.SerialException as E:
+                print("Erreur : \n")
+                print(E)
+                #on arete l'execution
+                return ''
+
+
+def sendON(PORT_UART):
+        #Fonction d'envoit de la trame de type ON
+        ON = b'\x53\x06\x01\x02\x4F\x34'        #Déclaration de la trame ON sous forme d'octets
+        octets = list(ON)                       #Conversion en list d'octets
+        #On instancie une boucle pour écrire octet par octet dans le port série
+        #for octet in octets:
+        for byte in ON:
+            try:
+                print(byte)
+                PORT_UART.write(byte.to_bytes(1,'big')) #Fonction d'écriture de l'octet dans la list octets
+            except serial.SerialException as E:
+                # En cas d'erreur
+                print("Erreur : ", E)  #Affichage du code d'erreur
+
+
+def sendOFF(PORT_UART):
+        # Fonction d'envoit de la trame de type ON
+        ON = b'\x53\x01\x01\x06\x4F\x34'  # Déclaration de la trame ON sous forme d'octets
+        octets = list(ON)  # Conversion en list d'octets
+
+        # On instancie une boucle pour écrire octet par octet dans le port série
+        for octet in octets:
+            try:
+                PORT_UART.write(octet)  # Fonction d'écriture de l'octet dans la list octets
+            except serial.SerialException as E:
+                # En cas d'erreur
+                print("Erreur : ", E)  # Affichage du code d'erreur
+
+
+def sendACKOFF(PORT_UART):
+        # Fonction d'envoit de la trame de type ON
+        ON = b'\x53\x01\x01\x06\x4F\x34'  # Déclaration de la trame ON sous forme d'octets
+        octets = list(ON)  # Conversion en list d'octets
+
+        # On instancie une boucle pour écrire octet par octet dans le port série
+        for octet in octets:
+            try:
+                PORT_UART.write(octet)  # Fonction d'écriture de l'octet dans la list octets
+            except serial.SerialException as E:
+                # En cas d'erreur
+                print("Erreur : ", E)  # Affichage du code d'erreur
+
+
+def sendACKON(PORT_UART):
+        # Fonction d'envoit de la trame de type ON
+        ON = b'\x53\x01\x01\x06\x4F\x34'  # Déclaration de la trame ON sous forme d'octets
+        octets = list(ON)  # Conversion en list d'octets
+
+        # On instancie une boucle pour écrire octet par octet dans le port série
+        for octet in octets:
+            try:
+                PORT_UART.write(octet)  # Fonction d'écriture de l'octet dans la list octets
+            except serial.SerialException as E:
+                # En cas d'erreur
+                print("Erreur : ", E)  # Affichage du code d'erreur
+
+
+def runUART(NB=5):
+    PORT_UART = init_serial()  #Initialisation de la connexion série
+    sendON(PORT_UART)  #Envoit de la trame sur le port
+    tags = []   #Tableau de tags
+    while NB>len(tags):  #Boucle de récupération des tags
+        TAG = getCONTENT(PORT_UART,NB)   #récupération et stockage des tags
+        if TAG != None:
+            tags.append(TAG)        #Ajout du tag lu dans le tableau
+    #On retourne le tableau de tag
+    return tags
